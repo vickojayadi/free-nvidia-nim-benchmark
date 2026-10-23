@@ -11,7 +11,8 @@ Definitions:
 - avg time: mean end-to-end stream duration across successful runs.
 - ttft: mean time to first generated token/delta, including reasoning tokens when streamed.
 - best time: fastest successful end-to-end stream duration.
-- throughput: mean completion tokens/second when NVIDIA returns completion token usage.
+- throughput: mean streamed output tokens/second when NVIDIA returns usage and emits
+  at least two generated events; single-chunk responses are reported as N/A.
 
 Scope:
 This script benchmarks general/agentic text-generating Free Endpoints that use
@@ -100,6 +101,34 @@ def mean_or_none(values: list[float]) -> float | None:
     return round(statistics.mean(values), 4) if values else None
 
 
+def calculate_stream_throughput(
+    completion_tokens: int | None,
+    first_generated_at: float | None,
+    last_generated_at: float | None,
+    generated_events: int,
+) -> float | None:
+    """Return comparable streamed token throughput, or None for batch-like output.
+
+    A model that emits its entire answer in one SSE delta has no measurable token
+    generation interval. Dividing its token count by a near-zero duration produces
+    absurd rates, so single-event streams are intentionally reported as N/A.
+    """
+    if (
+        not isinstance(completion_tokens, int)
+        or completion_tokens <= 1
+        or generated_events < 2
+        or first_generated_at is None
+        or last_generated_at is None
+    ):
+        return None
+    duration = last_generated_at - first_generated_at
+    if duration <= 0:
+        return None
+    # The first token/delta already exists at first_generated_at, so measure the
+    # remaining output over the interval until the final generated event.
+    return (completion_tokens - 1) / duration
+
+
 def request_json(url: str, api_key: str, timeout: float) -> dict[str, Any]:
     req = urllib.request.Request(
         url,
@@ -145,6 +174,8 @@ def _stream_request(
 
     started = time.perf_counter()
     first_generated_at: float | None = None
+    last_generated_at: float | None = None
+    generated_events = 0
     completion_tokens: int | None = None
     prompt_tokens: int | None = None
     finish_reason: str | None = None
@@ -197,21 +228,26 @@ def _stream_request(
                         generated = True
                         generated_chars += len(content)
 
-                    if generated and first_generated_at is None:
-                        first_generated_at = now
+                    if generated:
+                        generated_events += 1
+                        last_generated_at = now
+                        if first_generated_at is None:
+                            first_generated_at = now
                     if choice.get("finish_reason") is not None:
                         finish_reason = str(choice.get("finish_reason"))
 
         ended = time.perf_counter()
-        generation_s = ended - first_generated_at if first_generated_at is not None else None
-        tokens_per_s = None
-        if (
-            isinstance(completion_tokens, int)
-            and completion_tokens >= 0
-            and generation_s is not None
-            and generation_s > 0
-        ):
-            tokens_per_s = completion_tokens / generation_s
+        generation_s = (
+            last_generated_at - first_generated_at
+            if first_generated_at is not None and last_generated_at is not None
+            else None
+        )
+        tokens_per_s = calculate_stream_throughput(
+            completion_tokens=completion_tokens,
+            first_generated_at=first_generated_at,
+            last_generated_at=last_generated_at,
+            generated_events=generated_events,
+        )
 
         if first_generated_at is None:
             return {
@@ -232,6 +268,7 @@ def _stream_request(
             "input_tokens": prompt_tokens,
             "output_tokens": completion_tokens,
             "tokens_per_s": round(tokens_per_s, 2) if tokens_per_s is not None else None,
+            "generated_events": generated_events,
             "generated_chars": generated_chars,
             "finish_reason": finish_reason,
         }
@@ -405,7 +442,18 @@ def render_table(rows: list[dict[str, Any]]) -> str:
 def save_csv(path: str, rows: list[dict[str, Any]]) -> None:
     if not rows:
         return
-    fields = list(rows[0].keys())
+
+    # Error rows and successful streaming rows intentionally have different keys.
+    # Build a stable union of all fields instead of assuming the first row defines
+    # the schema for every subsequent row.
+    fields: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        for key in row:
+            if key not in seen:
+                fields.append(key)
+                seen.add(key)
+
     with open(path, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
@@ -517,7 +565,7 @@ def main() -> None:
     print("\nNotes:")
     print("  - Score is relative to the models in this exact run; do not compare scores across separate runs.")
     print("  - Intelligence is external quality data and is intentionally NOT part of the latency score.")
-    print("  - Throughput is N/A if a model endpoint does not return completion_tokens in streaming usage.")
+    print("  - Throughput is N/A when usage is missing or the endpoint emits the answer as a single generated chunk.")
     print("  - GLM-5.3 is shown because it is in the uploaded/current catalog, but NVIDIA currently marks it for deprecation.")
 
     prefix = Path(args.output)
