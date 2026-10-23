@@ -90,6 +90,17 @@ class BenchmarkSummaryTests(unittest.TestCase):
             ),
             100.0,
         )
+        self.assertIsNone(
+            nb.calculate_stream_throughput(
+                completion_tokens=192,
+                first_generated_at=10.0,
+                last_generated_at=10.001,
+                generated_events=2,
+            )
+        )
+
+    def test_benchmark_version_is_exposed(self):
+        self.assertEqual(nb.BENCHMARK_VERSION, "1.2.0")
 
 
 if __name__ == "__main__":

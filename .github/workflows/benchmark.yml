@@ -27,6 +27,15 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Verify benchmark version
+        run: |
+          python nim_benchmark.py --version
+          python - <<'PY'
+          import nim_benchmark as nb
+          assert nb.BENCHMARK_VERSION == "1.2.0", nb.BENCHMARK_VERSION
+          print("Verified benchmark version:", nb.BENCHMARK_VERSION)
+          PY
+
       - name: Run unit tests
         run: python -m unittest -v test_nim_benchmark.py
 

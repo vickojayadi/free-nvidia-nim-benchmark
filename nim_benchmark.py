@@ -38,6 +38,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+BENCHMARK_VERSION = "1.2.0"
+MIN_STREAM_WINDOW_S = 0.05
+
 BASE = "https://integrate.api.nvidia.com/v1"
 CHAT_URL = BASE + "/chat/completions"
 MODELS_URL = BASE + "/models"
@@ -122,7 +125,10 @@ def calculate_stream_throughput(
     ):
         return None
     duration = last_generated_at - first_generated_at
-    if duration <= 0:
+    # Some endpoints buffer almost the complete answer and then emit several SSE
+    # events back-to-back. Treat sub-50 ms windows as batch-like because dividing
+    # token count by that tiny interval creates meaningless six-digit TPS values.
+    if duration < MIN_STREAM_WINDOW_S:
         return None
     # The first token/delta already exists at first_generated_at, so measure the
     # remaining output over the interval until the final generated event.
@@ -471,6 +477,7 @@ def parse_models(value: str | None) -> list[str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="NVIDIA NIM Free Endpoint latency benchmark")
+    parser.add_argument("--version", action="version", version=f"nim-benchmark {BENCHMARK_VERSION}")
     parser.add_argument("--runs", type=int, default=3, help="measured streaming requests per model")
     parser.add_argument("--max-tokens", type=int, default=256)
     parser.add_argument("--timeout", type=float, default=180.0)
@@ -527,6 +534,7 @@ def main() -> None:
         raise SystemExit(3)
 
     print("NVIDIA NIM FREE ENDPOINT LATENCY BENCHMARK")
+    print(f"Version: {BENCHMARK_VERSION}")
     print(f"Target : {CHAT_URL}")
     print(f"Models : {len(models)}")
     print(f"Runs   : {args.runs}/model, max_tokens={args.max_tokens}")
