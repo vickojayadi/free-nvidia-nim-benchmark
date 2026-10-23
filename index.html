@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>NVIDIA NIM Benchmark</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --surface: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --accent: #1f2937;
+      --accent-soft: #eef2f7;
+      --good: #166534;
+      --good-bg: #dcfce7;
+      --warn: #92400e;
+      --warn-bg: #fef3c7;
+      --bad: #991b1b;
+      --bad-bg: #fee2e2;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 40px 0 56px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: clamp(28px, 4vw, 38px);
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .meta {
+      text-align: right;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .meta strong {
+      display: block;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      min-height: 112px;
+    }
+
+    .card-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .card-value {
+      margin-top: 10px;
+      font-size: 19px;
+      line-height: 1.25;
+      font-weight: 720;
+      word-break: break-word;
+    }
+
+    .card-detail {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .source-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #16a34a;
+    }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 930px;
+    }
+
+    th, td {
+      padding: 13px 14px;
+      text-align: right;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    th {
+      background: #fafafa;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.025em;
+      text-transform: uppercase;
+    }
+
+    th:first-child, td:first-child,
+    th:nth-child(2), td:nth-child(2) {
+      text-align: left;
+    }
+
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: #fafafa; }
+
+    .model {
+      max-width: 320px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 650;
+    }
+
+    .score {
+      display: inline-flex;
+      min-width: 44px;
+      justify-content: center;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 750;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-weight: 650;
+      font-size: 12px;
+    }
+
+    .status::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .healthy { color: var(--good); background: var(--good-bg); }
+    .degraded { color: var(--warn); background: var(--warn-bg); }
+    .down { color: var(--bad); background: var(--bad-bg); }
+
+    .help {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 18px;
+      padding: 18px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .help strong {
+      display: block;
+      color: var(--text);
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+
+    .notice {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .error {
+      padding: 28px 18px;
+      color: var(--bad);
+      font-size: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .help { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 620px) {
+      .page { width: min(100% - 20px, 1180px); padding-top: 24px; }
+      .topbar { display: block; }
+      .meta { margin-top: 14px; text-align: left; }
+      .cards { grid-template-columns: 1fr; }
+      .help { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div>
+        <h1>NVIDIA NIM Benchmark</h1>
+        <p class="subtitle">Hourly latency snapshot from a GitHub-hosted runner.</p>
+      </div>
+      <div class="meta" aria-live="polite">
+        <span>Last benchmark</span>
+        <strong id="updated">Loading...</strong>
+      </div>
+    </header>
+
+    <section class="cards" aria-label="Benchmark highlights">
+      <article class="card">
+        <div class="card-label">Best overall</div>
+        <div class="card-value" id="best-overall">—</div>
+        <div class="card-detail" id="best-overall-detail">Highest local score</div>
+      </article>
+      <article class="card">
+        <div class="card-label">Fastest start</div>
+        <div class="card-value" id="fastest-ttft">—</div>
+        <div class="card-detail" id="fastest-ttft-detail">Lowest TTFT</div>
+      </article>
+      <article class="card">
+        <div class="card-label">Fastest response</div>
+        <div class="card-value" id="fastest-total">—</div>
+        <div class="card-detail" id="fastest-total-detail">Lowest average time</div>
+      </article>
+      <article class="card">
+        <div class="card-label">Highest throughput</div>
+        <div class="card-value" id="highest-throughput">—</div>
+        <div class="card-detail" id="highest-throughput-detail">Tokens per second</div>
+      </article>
+    </section>
+
+    <section class="panel" aria-labelledby="results-heading">
+      <div class="panel-head">
+        <h2 class="panel-title" id="results-heading">Latest results</h2>
+        <div class="source-pill"><span class="dot" aria-hidden="true"></span> GitHub Actions → NVIDIA NIM</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Status</th>
+              <th>Score</th>
+              <th>Uptime</th>
+              <th>Intelligence</th>
+              <th>Avg time</th>
+              <th>TTFT</th>
+              <th>Best time</th>
+              <th>Throughput</th>
+            </tr>
+          </thead>
+          <tbody id="results-body"></tbody>
+        </table>
+      </div>
+      <div id="load-error" class="error" hidden></div>
+    </section>
+
+    <section class="help" aria-label="Metric explanations">
+      <div><strong>Score</strong>Relative performance score for this benchmark run. Higher is better.</div>
+      <div><strong>Uptime</strong>Percentage of benchmark requests that succeeded. This is not NVIDIA's official SLA.</div>
+      <div><strong>TTFT</strong>Time to first token: how quickly the model starts responding. Lower is better.</div>
+      <div><strong>Throughput</strong>Output generation speed in tokens per second. Higher is better.</div>
+    </section>
+
+    <p class="notice">Results reflect the network path and shared GitHub runner used for that run. They should be read as comparative snapshots, not universal latency guarantees.</p>
+  </main>
+
+  <script>
+    const demoData = {
+      timestamp_utc: new Date().toISOString(),
+      summary: [
+        { model: "nvidia/nemotron-3.5-lightning-30b-a3b", score: 92.8, uptime_pct: 100, intelligence: 13, avg_time_s: 1.72, ttft_s: 0.29, best_time_s: 1.59, throughput_tps: 327.0 },
+        { model: "minimaxai/minimax-m3.1-flash", score: 90.4, uptime_pct: 100, intelligence: 43, avg_time_s: 2.31, ttft_s: 0.34, best_time_s: 2.10, throughput_tps: 198.0 },
+        { model: "z-ai/glm-5.3-flash", score: 83.1, uptime_pct: 100, intelligence: 42, avg_time_s: 3.01, ttft_s: 0.49, best_time_s: 2.70, throughput_tps: 151.0 },
+        { model: "deepseek-ai/deepseek-v4.1-flash", score: 77.2, uptime_pct: 50, intelligence: 39, avg_time_s: 3.42, ttft_s: 0.54, best_time_s: 3.19, throughput_tps: 143.0 }
+      ]
+    };
+
+    const fmt = (value, digits = 2, suffix = "") =>
+      Number.isFinite(value) ? `${value.toFixed(digits)}${suffix}` : "N/A";
+
+    const shortName = (model) => model.includes("/") ? model.split("/").slice(1).join("/") : model;
+
+    const statusFor = (uptime) => {
+      if (uptime >= 100) return ["Healthy", "healthy"];
+      if (uptime > 0) return ["Degraded", "degraded"];
+      return ["Down", "down"];
+    };
+
+    const bestBy = (rows, key, direction) => {
+      const valid = rows.filter((row) => Number.isFinite(row[key]));
+      if (!valid.length) return null;
+      return valid.reduce((best, row) =>
+        direction === "min" ? (row[key] < best[key] ? row : best) : (row[key] > best[key] ? row : best)
+      );
+    };
+
+    function render(data, isDemo = false) {
+      const rows = Array.isArray(data.summary) ? [...data.summary] : [];
+      rows.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+
+      const tbody = document.getElementById("results-body");
+      tbody.innerHTML = "";
+
+      for (const row of rows) {
+        const [statusText, statusClass] = statusFor(Number(row.uptime_pct || 0));
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="model" title="${row.model}">${shortName(row.model)}</td>
+          <td><span class="status ${statusClass}">${statusText}</span></td>
+          <td><span class="score">${fmt(Number(row.score), 1)}</span></td>
+          <td>${fmt(Number(row.uptime_pct), 1, "%")}</td>
+          <td>${Number.isFinite(row.intelligence) ? row.intelligence : "N/A"}</td>
+          <td>${fmt(Number(row.avg_time_s), 2, " s")}</td>
+          <td>${fmt(Number(row.ttft_s), 2, " s")}</td>
+          <td>${fmt(Number(row.best_time_s), 2, " s")}</td>
+          <td>${fmt(Number(row.throughput_tps), 1, " t/s")}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      const overall = bestBy(rows, "score", "max");
+      const ttft = bestBy(rows, "ttft_s", "min");
+      const avg = bestBy(rows, "avg_time_s", "min");
+      const throughput = bestBy(rows, "throughput_tps", "max");
+
+      document.getElementById("best-overall").textContent = overall ? shortName(overall.model) : "N/A";
+      document.getElementById("best-overall-detail").textContent = overall ? `Score ${fmt(overall.score, 1)}` : "No data";
+
+      document.getElementById("fastest-ttft").textContent = ttft ? shortName(ttft.model) : "N/A";
+      document.getElementById("fastest-ttft-detail").textContent = ttft ? `${fmt(ttft.ttft_s, 2, " s")} to first token` : "No data";
+
+      document.getElementById("fastest-total").textContent = avg ? shortName(avg.model) : "N/A";
+      document.getElementById("fastest-total-detail").textContent = avg ? `${fmt(avg.avg_time_s, 2, " s")} average` : "No data";
+
+      document.getElementById("highest-throughput").textContent = throughput ? shortName(throughput.model) : "N/A";
+      document.getElementById("highest-throughput-detail").textContent = throughput ? fmt(throughput.throughput_tps, 1, " t/s") : "No data";
+
+      const stamp = data.timestamp_utc ? new Date(data.timestamp_utc) : null;
+      const updated = stamp && !Number.isNaN(stamp.getTime())
+        ? stamp.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+        : "Unknown";
+      document.getElementById("updated").textContent = isDemo ? `${updated} · Demo data` : updated;
+    }
+
+    async function load() {
+      try {
+        const response = await fetch("latest.json", { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        render(await response.json(), false);
+      } catch (error) {
+        if (location.protocol === "file:") {
+          render(demoData, true);
+          return;
+        }
+        document.querySelector(".table-wrap").hidden = true;
+        const box = document.getElementById("load-error");
+        box.hidden = false;
+        box.textContent = `Benchmark data is not available yet (${error.message}). Run the GitHub Actions workflow once.`;
+        document.getElementById("updated").textContent = "No data yet";
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>
